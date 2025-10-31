@@ -28,6 +28,23 @@ export default function Home() {
     setInput('');
 
     try {
+      // If user asks for a quote (명언 조회), call our API and show it directly
+      if (trimmed.includes('명언 조회')) {
+        const quoteRes = await fetch('/api/famoussaying');
+        if (!quoteRes.ok) {
+          throw new Error(`Failed to fetch quote: ${quoteRes.status}`);
+        }
+        const quoteData = await quoteRes.json();
+        const text = quoteData?.contents || quoteData?.content || '';
+        const name = quoteData?.name ? ` — ${quoteData.name}` : '';
+        const display = text ? `${text}${name}` : '명언을 가져오지 못했습니다.';
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: display },
+        ]);
+        return;
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
