@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -13,6 +13,7 @@ export default function Home() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showKakaoLogin, setShowKakaoLogin] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const sendMessage = useCallback(async () => {
@@ -45,6 +46,16 @@ export default function Home() {
         return;
       }
 
+      // If user asks for Kakao login, show login button and skip OpenAI
+      if (trimmed.includes('카카오 로그인')) {
+        setShowKakaoLogin(true);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: '카카오 로그인을 진행하려면 아래 버튼을 눌러주세요.' },
+        ]);
+        return;
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +84,32 @@ export default function Home() {
       inputRef.current?.focus();
     }
   }, [input, loading, messages]);
+
+  // On mount, check if redirected back from Kakao
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kakao = params.get('kakao');
+    const nickname = params.get('nickname');
+    if (kakao === 'ok') {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: nickname ? `카카오 로그인 완료! (${nickname})` : '카카오 로그인 완료!' },
+      ]);
+      setShowKakaoLogin(false);
+      params.delete('kakao');
+      params.delete('nickname');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    } else if (kakao === 'error') {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: '카카오 로그인에 실패했습니다.' },
+      ]);
+      params.delete('kakao');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -131,6 +168,19 @@ export default function Home() {
               Send
             </button>
           </div>
+          {showKakaoLogin && (
+            <div className="mt-3">
+              <button
+                onClick={() => {
+                  const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+                  window.location.href = `/api/kakao/login?returnUrl=${returnUrl}`;
+                }}
+                className="px-4 py-2 rounded-lg bg-yellow-400 text-black"
+              >
+                카카오로 로그인
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </main>
