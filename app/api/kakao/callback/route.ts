@@ -69,20 +69,26 @@ export async function GET(request: Request) {
     redirectTarget.searchParams.set("kakao", "ok");
     if (nickname) redirectTarget.searchParams.set("nickname", nickname);
 
-    const isHttps = url.protocol === "https:";
-    const cookieParts = [
-      `kakao_access_token=${accessToken ? encodeURIComponent(accessToken) : ""}`,
-      `Path=/`,
-      `HttpOnly`,
-      `SameSite=Lax`,
-      `Max-Age=${expiresIn}`,
-    ];
-    if (isHttps) cookieParts.push("Secure");
-    const setCookie = cookieParts.join("; ");
-
     const headers = new Headers();
     headers.set("Location", redirectTarget.toString());
-    if (accessToken) headers.append("Set-Cookie", setCookie);
+
+    // Encrypt token before storing in cookie
+    if (accessToken) {
+      const { encryptToken } = await import("../../../../utils/kakao-crypto");
+      const encrypted = await encryptToken(accessToken);
+      const isHttps = url.protocol === "https:";
+      // Use more generic cookie name and strict settings for better security
+      const cookieParts = [
+        `ka_sess=${encodeURIComponent(encrypted)}`,
+        `Path=/`,
+        `HttpOnly`,
+        `SameSite=Strict`, // Strict for CSRF protection
+        `Max-Age=${expiresIn}`,
+      ];
+      if (isHttps) cookieParts.push("Secure"); // HTTPS only in production
+      const setCookie = cookieParts.join("; ");
+      headers.append("Set-Cookie", setCookie);
+    }
 
     return new Response(null, {
       status: 302,

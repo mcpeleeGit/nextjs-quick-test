@@ -5,16 +5,26 @@ const USER_URL = "https://kapi.kakao.com/v2/user/me";
 export async function GET(request: Request) {
   try {
     const cookieHeader = request.headers.get("cookie") || request.headers.get("Cookie") || "";
-    const token = parseCookie(cookieHeader).get("kakao_access_token");
-    if (!token) {
+    const encrypted = parseCookie(cookieHeader).get("ka_sess");
+    if (!encrypted) {
       return new Response(JSON.stringify({ error: "NO_TOKEN" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
+    // Decrypt token from cookie
+    const { decryptToken } = await import("../../../../utils/kakao-crypto");
+    const token = await decryptToken(decodeURIComponent(encrypted));
+    if (!token) {
+      return new Response(JSON.stringify({ error: "INVALID_TOKEN" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const res = await fetch(USER_URL, {
-      headers: { Authorization: `Bearer ${decodeURIComponent(token)}` },
+      headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
     if (!res.ok) {
