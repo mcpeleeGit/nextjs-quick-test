@@ -1,16 +1,17 @@
 import OpenAI from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export const runtime = "edge";
 
-type ChatMessage = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
+type IncomingMessage = {
+  role: string;
+  content?: unknown;
 };
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const messages: ChatMessage[] = Array.isArray(body?.messages)
+    const incoming: IncomingMessage[] = Array.isArray(body?.messages)
       ? body.messages
       : [];
     const model: string = body?.model || "gpt-4o-mini";
@@ -24,9 +25,30 @@ export async function POST(request: Request) {
       );
     }
 
-    if (messages.length === 0) {
+    if (incoming.length === 0) {
       return new Response(
         JSON.stringify({ error: "messages array is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sanitize and coerce incoming messages to OpenAI SDK's expected type
+    const messages: ChatCompletionMessageParam[] = incoming
+      .map((m): ChatCompletionMessageParam | null => {
+        const role = typeof m.role === "string" ? m.role : "";
+        const content = typeof m.content === "string" ? m.content : "";
+        if (!content) return null;
+        if (role === "system" || role === "user" || role === "assistant") {
+          return { role, content } as ChatCompletionMessageParam;
+        }
+        // Drop unsupported roles like "tool" to avoid type mismatches
+        return null;
+      })
+      .filter((m): m is ChatCompletionMessageParam => m !== null);
+
+    if (messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No valid messages after sanitization" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
