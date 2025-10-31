@@ -54,10 +54,19 @@ export async function POST(request: Request) {
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+    // Prepend a system message with the current date/time so the model knows "today"
+    const now = new Date();
+    const kstString = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+    const systemDateMessage = {
+      role: "system",
+      content: `오늘은 ${kstString} (Asia/Seoul) 입니다. 사용자가 날짜/시간을 물으면 이 정보를 기준으로 답변하세요.`,
+    };
+    const finalMessages = [systemDateMessage, ...messages];
+
     const completion = await client.chat.completions.create({
       model,
       // Cast to any to satisfy TS in some build environments; shape is valid at runtime
-      messages: messages as any,
+      messages: finalMessages as any,
       temperature,
     });
 
