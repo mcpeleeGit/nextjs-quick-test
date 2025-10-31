@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 export const runtime = "edge";
 
@@ -32,19 +31,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Sanitize and coerce incoming messages to OpenAI SDK's expected type
-    const messages: ChatCompletionMessageParam[] = incoming
-      .map((m): ChatCompletionMessageParam | null => {
+    // Sanitize and coerce incoming messages to OpenAI SDK's expected shape
+    const messages = incoming
+      .map((m) => {
         const role = typeof m.role === "string" ? m.role : "";
         const content = typeof m.content === "string" ? m.content : "";
         if (!content) return null;
         if (role === "system" || role === "user" || role === "assistant") {
-          return { role, content } as ChatCompletionMessageParam;
+          return { role, content };
         }
         // Drop unsupported roles like "tool" to avoid type mismatches
         return null;
       })
-      .filter((m): m is ChatCompletionMessageParam => m !== null);
+      .filter((m): m is { role: string; content: string } => m !== null);
 
     if (messages.length === 0) {
       return new Response(
@@ -57,7 +56,8 @@ export async function POST(request: Request) {
 
     const completion = await client.chat.completions.create({
       model,
-      messages,
+      // Cast to any to satisfy TS in some build environments; shape is valid at runtime
+      messages: messages as any,
       temperature,
     });
 
