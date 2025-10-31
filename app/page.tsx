@@ -1,74 +1,118 @@
 'use client';
 
-import { useState } from 'react';
-import RollingPaperShare from '@/components/RollingPaperShare';
+import { useCallback, useRef, useState } from 'react';
+
+type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
 
 export default function Home() {
-  const [userName, setUserName] = useState('홍길동');
-  const [messageCount, setMessageCount] = useState(5);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'system', content: 'You are a helpful assistant.' },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const sendMessage = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || loading) return;
+    setLoading(true);
+
+    const nextMessages: ChatMessage[] = [
+      ...messages,
+      { role: 'user', content: trimmed },
+    ];
+    setMessages(nextMessages);
+    setInput('');
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: nextMessages, model: 'gpt-4o-mini' }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `Request failed: ${res.status}`);
+      }
+      const data = await res.json();
+      const assistantReply: string = data?.choices?.[0]?.message?.content || '';
+      if (assistantReply) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: assistantReply },
+        ]);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Error: ${message}` },
+      ]);
+    } finally {
+      setLoading(false);
+      inputRef.current?.focus();
+    }
+  }, [input, loading, messages]);
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    },
+    [sendMessage]
+  );
 
   return (
     <main className="min-h-screen bg-gray-100 py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-          카카오톡 롤링페이퍼 공유 테스트
-        </h1>
-
-        <div className="max-w-2xl mx-auto">
-          {/* 설정 패널 */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">
-              테스트 설정
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-1">
-                  사용자명
-                </label>
-                <input
-                  id="userName"
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  placeholder="사용자명을 입력하세요"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="messageCount" className="block text-sm font-medium text-gray-700 mb-1">
-                  메시지 수
-                </label>
-                <input
-                  id="messageCount"
-                  type="number"
-                  value={messageCount}
-                  onChange={(e) => setMessageCount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  min="0"
-                />
-              </div>
-            </div>
+        <div className="mx-auto max-w-2xl">
+          <h1 className="text-2xl font-semibold mb-4">GPT Chat</h1>
+          <div className="border rounded-lg p-4 h-[60vh] overflow-y-auto bg-white">
+            {messages
+              .filter((m) => m.role !== 'system')
+              .map((m, idx) => (
+                <div
+                  key={idx}
+                  className={m.role === 'user' ? 'text-right mb-3' : 'text-left mb-3'}
+                >
+                  <div
+                    className={
+                      m.role === 'user'
+                        ? 'inline-block bg-blue-600 text-white px-3 py-2 rounded-lg'
+                        : 'inline-block bg-gray-100 text-gray-900 px-3 py-2 rounded-lg'
+                    }
+                  >
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+            {loading && (
+              <div className="text-left text-gray-500">Thinking…</div>
+            )}
           </div>
-
-          {/* 공유 컴포넌트 */}
-          <RollingPaperShare 
-            userName={userName} 
-            messageCount={messageCount} 
-          />
-
-          {/* 사용법 안내 */}
-          <div className="mt-8 bg-blue-50 rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-3 text-blue-800">
-              사용법 안내
-            </h3>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-blue-700">
-              <li>위의 설정에서 사용자명과 메시지 수를 조정할 수 있습니다.</li>
-              <li>"카카오톡으로 공유하기" 버튼을 클릭하면 카카오톡 공유 창이 열립니다.</li>
-              <li>실제 카카오톡 공유를 위해서는 카카오 개발자 콘솔에서 앱을 등록하고 JavaScript 키를 발급받아야 합니다.</li>
-              <li>발급받은 키를 <code className="bg-blue-200 px-1 rounded">utils/kakao.ts</code> 파일의 <code className="bg-blue-200 px-1 rounded">YOUR_KAKAO_APP_KEY</code> 부분에 입력하세요.</li>
-            </ol>
+          <div className="mt-4 flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Type your message and press Enter"
+              className="flex-1 border rounded-lg px-3 py-2"
+              disabled={loading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-50"
+            >
+              Send
+            </button>
           </div>
         </div>
       </div>
