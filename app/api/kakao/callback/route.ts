@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     }
     const tokenData = await tokenRes.json();
     const accessToken = tokenData?.access_token as string | undefined;
+    const expiresIn = Number(tokenData?.expires_in) || 3600;
 
     // Optionally fetch user info
     let nickname = "";
@@ -68,9 +69,24 @@ export async function GET(request: Request) {
     redirectTarget.searchParams.set("kakao", "ok");
     if (nickname) redirectTarget.searchParams.set("nickname", nickname);
 
+    const isHttps = url.protocol === "https:";
+    const cookieParts = [
+      `kakao_access_token=${accessToken ? encodeURIComponent(accessToken) : ""}`,
+      `Path=/`,
+      `HttpOnly`,
+      `SameSite=Lax`,
+      `Max-Age=${expiresIn}`,
+    ];
+    if (isHttps) cookieParts.push("Secure");
+    const setCookie = cookieParts.join("; ");
+
+    const headers = new Headers();
+    headers.set("Location", redirectTarget.toString());
+    if (accessToken) headers.append("Set-Cookie", setCookie);
+
     return new Response(null, {
       status: 302,
-      headers: { Location: redirectTarget.toString() },
+      headers,
     });
   } catch (e) {
     const redirectTarget = new URL(returnUrl, origin);

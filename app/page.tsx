@@ -56,6 +56,27 @@ export default function Home() {
         return;
       }
 
+      // If user asks for Kakao profile, fetch using session token
+      if (trimmed.includes('카카오 프로필')) {
+        const profileRes = await fetch('/api/kakao/profile');
+        if (!profileRes.ok) {
+          const err = await profileRes.json().catch(() => ({}));
+          const msg = err?.error === 'NO_TOKEN' ? '로그인이 필요합니다.' : `프로필 조회 실패 (${profileRes.status})`;
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: msg },
+          ]);
+          return;
+        }
+        const profile = await profileRes.json();
+        const nickname = profile?.kakao_account?.profile?.nickname || '알 수 없음';
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `카카오 프로필 닉네임: ${nickname}` },
+        ]);
+        return;
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
