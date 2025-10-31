@@ -1,58 +1,73 @@
-# 카카오톡 롤링페이퍼 공유 테스트
+# Next.js GPT Chat
 
-Next.js를 사용한 카카오톡 공유 기능 테스트 프로젝트입니다.
+Next.js 14(App Router)와 OpenAI SDK로 구현한 간단한 GPT 웹 채팅입니다.
 
-## 기능
+## 주요 기능
 
-- 롤링페이퍼 카카오톡 공유 기능 테스트
-- 사용자명과 메시지 수 설정 가능
-- 실제 카카오톡 공유 시뮬레이션
+- OpenAI Chat Completions 기반 서버 API (`/api/chat`)
+- 홈 화면(`/`)에서 바로 대화 가능한 간단한 채팅 UI
 
-## 설치 및 실행
+## 빠른 시작
 
-1. 의존성 설치:
+1) 의존성 설치
 ```bash
 npm install
 ```
 
-2. 개발 서버 실행:
+2) 환경 변수 설정
+프로젝트 루트의 `.env` 파일에 OpenAI API 키를 넣어주세요.
+```
+OPENAI_API_KEY=sk-...
+```
+
+3) 개발 서버 실행
 ```bash
 npm run dev
 ```
 
-3. 브라우저에서 `http://localhost:3000` 접속
+브라우저에서 `http://localhost:3000` 접속 후 곧바로 채팅을 시작할 수 있습니다.
 
-## 카카오톡 공유 설정
+## API
 
-실제 카카오톡 공유를 사용하려면:
+- 엔드포인트: `POST /api/chat`
+- 요청 바디 예시
+```json
+{
+  "messages": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello!" }
+  ],
+  "model": "gpt-4o-mini",
+  "temperature": 0.7
+}
+```
+- 응답: OpenAI Chat Completions 원본 응답과 동일 구조(`choices[0].message.content` 사용)
 
-1. [카카오 개발자 콘솔](https://developers.kakao.com/)에서 앱 등록
-2. JavaScript 키 발급
-3. `utils/kakao.ts` 파일의 `YOUR_KAKAO_APP_KEY` 부분을 발급받은 키로 교체
-
-## 프로젝트 구조
+## 폴더 구조
 
 ```
 ├── app/
+│   ├── api/
+│   │   └── chat/
+│   │       └── route.ts      # OpenAI 호출 API
 │   ├── globals.css
 │   ├── layout.tsx
-│   ├── page.tsx
-│   └── rolling-paper/
-│       └── [userName]/
-│           └── page.tsx
-├── components/
-│   └── RollingPaperShare.tsx
-├── types/
-│   └── kakao.d.ts
+│   └── page.tsx              # 채팅 UI
+├── public/
+│   └── bigLog.png
 ├── utils/
-│   ├── kakao.ts
 │   └── logger.ts
-└── public/
-    └── bigLog.png
+├── types/
+│   └── kakao.d.ts            # (이전 실험 잔존 타입, 미사용)
+└── package.json
 ```
 
-## 사용법
+## 커스터마이징
 
-1. 메인 페이지에서 사용자명과 메시지 수를 설정
-2. "카카오톡으로 공유하기" 버튼 클릭
-3. 카카오톡 공유 창이 열림 (카카오 앱 키가 설정된 경우)
+- 모델/온도 변경: `app/page.tsx`의 `fetch('/api/chat', { body })` 부분 또는
+  서버 `app/api/chat/route.ts`에서 `model`, `temperature` 값을 변경하세요.
+- 스트리밍 응답: 필요 시 서버 라우트를 스트리밍 방식으로 변환해 확장 가능합니다.
+
+## 배포
+
+Vercel 배포 시 `Project Settings > Environment Variables`에 `OPENAI_API_KEY`를 등록하세요.
